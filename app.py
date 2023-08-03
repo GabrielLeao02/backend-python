@@ -1,12 +1,12 @@
 from flask import Flask, jsonify, request
 import mysql.connector
-from flask_cors import CORS  # Importe a classe CORS da extensão Flask-CORS
+from flask_cors import CORS
 import bcrypt
 
 app = Flask(__name__)
-CORS(app)  # Adicione CORS ao seu aplicativo Flask
+CORS(app)
 
-def criar_conexao():
+def create_connection():
     return mysql.connector.connect(
         host='127.0.0.1',
         user='root',
@@ -14,68 +14,68 @@ def criar_conexao():
         database='sistema',
     )
 
-@app.route('/salvarusuario', methods=['POST'])
-def incluir_novo_usuario():
+@app.route('/saveuser', methods=['POST'])
+def add_new_user():
     try:
-        conexao = criar_conexao()
-        cursor = conexao.cursor()
+        connection = create_connection()
+        cursor = connection.cursor()
 
-        usuario = request.get_json()
-        usuario_senha = usuario['usuario_senha']
+        user = request.get_json()
+        user_password = user['user_password']
 
-        # Criptografe a senha usando bcrypt
-        hashed_senha = bcrypt.hashpw(usuario_senha.encode('utf-8'), bcrypt.gensalt())
+        # Encrypt the password using bcrypt
+        hashed_password = bcrypt.hashpw(user_password.encode('utf-8'), bcrypt.gensalt())
 
-        # Substitua a senha original pela senha criptografada
-        usuario['usuario_senha'] = hashed_senha.decode('utf-8')
+        # Replace the original password with the encrypted password
+        user['user_password'] = hashed_password.decode('utf-8')
 
-        comando = "INSERT INTO `sys_usuarios` (`usuario_id`, `usuario_nome`, `usuario_cpf`, `usuario_email`, `usuario_senha`) VALUES (NULL, %s, %s, %s, %s)"
-        valores = (usuario['usuario_nome'], usuario['usuario_cpf'], usuario['usuario_email'], usuario['usuario_senha'])
+        query = "INSERT INTO `sys_users` (`user_id`, `user_name`, `user_cpf`, `user_email`, `user_password`) VALUES (NULL, %s, %s, %s, %s)"
+        values = (user['user_name'], user['user_cpf'], user['user_email'], user['user_password'])
 
-        cursor.execute(comando, valores)
-        conexao.commit()
+        cursor.execute(query, values)
+        connection.commit()
         cursor.close()
 
-        return jsonify(usuario)
+        return jsonify(user)
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
     finally:
-        conexao.close()
+        connection.close()
 
 @app.route('/login', methods=['POST'])
-def login_usuario():
+def login_user():
     try:
-        conexao = criar_conexao()
-        cursor = conexao.cursor()
+        connection = create_connection()
+        cursor = connection.cursor()
 
-        usuario = request.get_json()
-        email = usuario['usuario_email']
-        senha_criptografada_frontend = usuario['usuario_senha']
+        user = request.get_json()
+        email = user['user_email']
+        encrypted_password_frontend = user['user_password']
 
-        # Recupere a hash salgada do banco de dados para o usuário com o e-mail fornecido
-        comando = "SELECT usuario_senha FROM sys_usuarios WHERE usuario_email = %s"
-        cursor.execute(comando, (email,))
-        resultado = cursor.fetchone()
+        # Retrieve the salted hash from the database for the user with the provided email
+        query = "SELECT user_password FROM sys_users WHERE user_email = %s"
+        cursor.execute(query, (email,))
+        result = cursor.fetchone()
 
-        if resultado is not None:
-            # Recupere a hash salgada armazenada no banco de dados
-            senha_salgada_bd = resultado[0]
+        if result is not None:
+            # Retrieve the stored salted hash from the database
+            salted_hash_db = result[0]
 
-            # Verifique se a senha criptografada do frontend corresponde à hash salgada do banco de dados
-            if bcrypt.checkpw(senha_criptografada_frontend.encode('utf-8'), senha_salgada_bd.encode('utf-8')):
-                return jsonify({'message': 'Login com sucesso'}), 200
+            # Check if the encrypted password from the frontend matches the salted hash from the database
+            if bcrypt.checkpw(encrypted_password_frontend.encode('utf-8'), salted_hash_db.encode('utf-8')):
+                return jsonify({'message': 'Login successful'}), 200
             else:
-                return jsonify({'message': 'Senha incorreta'}), 401
+                return jsonify({'message': 'Incorrect password'}), 401
         else:
-            return jsonify({'message': 'Usuário não encontrado'}), 404
+            return jsonify({'message': 'User not found'}), 404
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
     finally:    
-        conexao.close()
+        connection.close()
 
 
 if __name__ == '__main__':
